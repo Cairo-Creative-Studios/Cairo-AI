@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Bubble
+namespace CairoAI.Layers
 {
     [Serializable]
     public class MultilayerPerceptron

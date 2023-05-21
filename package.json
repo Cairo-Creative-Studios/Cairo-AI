@@ -1,0 +1,13 @@
+ {
+    "name": "com.cairo.ai",
+    "displayName": "Expiremental AI Models",
+    "version": "0.2.0",
+    "unity": "2018.1",
+    "description": "A collection of AI models for use in Unity, with multiplatform training and inference support.",
+    "keywords": [
+        "unity",
+        "AI",
+        "Machine Learning"
+    ],
+    "category": "Cairo Creative Studios"
+}

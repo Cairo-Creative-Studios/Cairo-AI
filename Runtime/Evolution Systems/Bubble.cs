@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Bubble.Voronoi;
+using CairoAI.Layers;
+using CairoAI.Tools;
 using UnityEngine;
-using UnityEngine.Serialization;
 using Random = UnityEngine.Random;
 
-namespace Bubble
+namespace CairoAI.EvolutionSystems
 {
     [Serializable]
     public class Bubble

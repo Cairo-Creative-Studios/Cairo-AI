@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Vector2 = System.Numerics.Vector2;
 
-namespace Bubble.Voronoi
+namespace CairoAI.Tools
 {
     /// <summary>
     /// A class that represents a Voronoi Diagram in 1D, 2D or 3D space

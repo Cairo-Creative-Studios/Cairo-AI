@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "com.cairo.cai": "file:CairoAI.unitypackage"
+  }
+}
