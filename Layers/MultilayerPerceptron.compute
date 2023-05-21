@@ -1,0 +1,784 @@
+
+//Define the Kernel
+#pragma kernel feedforward;
+#pragma kernel train;
+#pragma kernel backpropagate;
+
+
+/* Activation Functions */
+double4x4 sigmoid(double4x4 x)
+{
+    return 1.0 / (1.0 + exp(-x));
+}
+
+double4x4 tanh(double4x4 x)
+{
+    return (exp(x) - exp(-x)) / (exp(x) + exp(-x));
+}
+
+double4x4 relu(double4x4 x)
+{
+    return max(0.0, x);
+}
+
+double4x4 leakyRelu(double4x4 x)
+{
+    return max(0.1 * x, x);
+}
+
+double4x4 elu(double4x4 x)
+{
+    return (x > 0.0) ? x : (exp(x) - 1.0);
+}
+
+double4x4 softplus(double4x4 x)
+{
+    return log(1.0 + exp(x));
+}
+
+double4x4 softsign(double4x4 x)
+{
+    return x / (1.0 + abs(x));
+}
+
+double4x4 sigmoid_with_sin(double4x4 x)
+{
+    return sigmoid(x) * sin(x);
+}
+
+double4x4 sigmoid_with_cos(double4x4 x)
+{
+    return sigmoid(x) * cos(x);
+}
+
+double4x4 sigmoid_with_tan(double4x4 x)
+{
+    return sigmoid(x) * tan(x);
+}
+
+double4x4 sigmoid_with_asin(double4x4 x)
+{
+    return sigmoid(x) * asin(x);
+}
+
+double4x4 sigmoid_with_acos(double4x4 x)
+{
+    return sigmoid(x) * acos(x);
+}
+
+double4x4 sigmoid_with_atan(double4x4 x)
+{
+    return sigmoid(x) * atan(x);
+}
+
+double4x4 sigmoid_with_sinh(double4x4 x)
+{
+    return sigmoid(x) * sinh(x);
+}
+
+double4x4 sigmoid_with_cosh(double4x4 x)
+{
+    return sigmoid(x) * cosh(x);
+}
+
+double4x4 tanh_with_sin(double4x4 x)
+{
+    return tanh(x) * sin(x);
+}
+
+double4x4 tanh_with_cos(double4x4 x)
+{
+    return tanh(x) * cos(x);
+}
+
+double4x4 tanh_with_tan(double4x4 x)
+{
+    return tanh(x) * tan(x);
+}
+
+double4x4 tanh_with_asin(double4x4 x)
+{
+    return tanh(x) * asin(x);
+}
+
+double4x4 tanh_with_acos(double4x4 x)
+{
+    return tanh(x) * acos(x);
+}
+
+double4x4 tanh_with_atan(double4x4 x)
+{
+    return tanh(x) * atan(x);
+}
+
+double4x4 tanh_with_sinh(double4x4 x)
+{
+    return tanh(x) * sinh(x);
+}
+
+double4x4 tanh_with_cosh(double4x4 x)
+{
+    return tanh(x) * cosh(x);
+}
+
+double4x4 relu_with_sin(double4x4 x)
+{
+    return relu(x) * sin(x);
+}
+
+double4x4 relu_with_cos(double4x4 x)
+{
+    return relu(x) * cos(x);
+}
+
+double4x4 relu_with_tan(double4x4 x)
+{
+    return relu(x) * tan(x);
+}
+
+double4x4 relu_with_asin(double4x4 x)
+{
+    return relu(x) * asin(x);
+}
+
+double4x4 relu_with_acos(double4x4 x)
+{
+    return relu(x) * acos(x);
+}
+
+double4x4 relu_with_atan(double4x4 x)
+{
+    return relu(x) * atan(x);
+}
+
+double4x4 relu_with_sinh(double4x4 x)
+{
+    return relu(x) * sinh(x);
+}
+
+double4x4 relu_with_cosh(double4x4 x)
+{
+    return relu(x) * cosh(x);
+}
+
+double4x4 leaky_relu_with_sin(double4x4 x)
+{
+    return leakyRelu(x) * sin(x);
+}
+
+double4x4 leaky_relu_with_cos(double4x4 x)
+{
+    return leakyRelu(x) * cos(x);
+}
+
+double4x4 leaky_relu_with_tan(double4x4 x)
+{
+    return leakyRelu(x) * tan(x);
+}
+
+double4x4 leaky_relu_with_asin(double4x4 x)
+{
+    return leakyRelu(x) * asin(x);
+}
+
+double4x4 leaky_relu_with_acos(double4x4 x)
+{
+    return leakyRelu(x) * acos(x);
+}
+
+double4x4 leaky_relu_with_atan(double4x4 x)
+{
+    return leakyRelu(x) * atan(x);
+}
+
+double4x4 leaky_relu_with_sinh(double4x4 x)
+{
+    return leakyRelu(x) * sinh(x);
+}
+
+double4x4 leaky_relu_with_cosh(double4x4 x)
+{
+    return leakyRelu(x) * cosh(x);
+}
+
+double4x4 swish(double4x4 x)
+{
+    return x / (1.0 + exp(-x));
+}
+
+double4x4 swish_with_sin(double4x4 x)
+{
+    return swish(x) * sin(x) * 0.25;
+}
+
+// Define the activation function (tanh)
+StructuredBuffer<int> activationFunction : register(t0);
+
+// Define the activation function (sigmoid)
+double4x4 activation(double4x4 x, int activationFunction)
+{
+    switch (activationFunction)
+    {
+        case 0: return sigmoid(x);
+        case 1: return tanh(x);
+        case 2: return relu(x);
+        case 3: return leakyRelu(x);
+        case 4: return softplus(x);
+        case 5: return softsign(x);
+        case 6: return sin(x);
+        case 7: return cos(x);
+        case 8: return tan(x);
+        case 9: return asin(x);
+        case 10: return acos(x);
+        case 11: return atan(x);
+        case 12: return sinh(x);
+        case 13: return cosh(x);
+        case 14: return sigmoid_with_sin(x);
+        case 15: return sigmoid_with_cos(x);
+        case 16: return sigmoid_with_tan(x);
+        case 17: return sigmoid_with_asin(x);
+        case 18: return sigmoid_with_acos(x);
+        case 19: return sigmoid_with_atan(x);
+        case 20: return sigmoid_with_sinh(x);
+        case 21: return sigmoid_with_cosh(x);
+        case 22: return tanh_with_sin(x);
+        case 23: return tanh_with_cos(x);
+        case 24: return tanh_with_tan(x);
+        case 25: return tanh_with_asin(x);
+        case 26: return tanh_with_acos(x);
+        case 27: return tanh_with_atan(x);
+        case 28: return tanh_with_sinh(x);
+        case 29: return tanh_with_cosh(x);
+        case 30: return relu_with_sin(x);
+        case 31: return relu_with_cos(x);
+        case 32: return relu_with_tan(x);
+        case 33: return relu_with_asin(x);
+        case 34: return relu_with_acos(x);
+        case 35: return relu_with_atan(x);
+        case 36: return relu_with_sinh(x);
+        case 37: return relu_with_cosh(x);
+        case 38: return leaky_relu_with_sin(x);
+        case 39: return leaky_relu_with_cos(x);
+        case 40: return leaky_relu_with_tan(x);
+        case 41: return leaky_relu_with_asin(x);
+        case 42: return leaky_relu_with_acos(x);
+        case 43: return leaky_relu_with_atan(x);
+        case 44: return leaky_relu_with_sinh(x);
+        case 45: return leaky_relu_with_cosh(x);
+        case 46: return swish(x);
+        default: return sigmoid_with_sin(x);
+    }
+}
+/*-----*/
+
+// Define the derivative of the activation function (sigmoid derivative)
+double4x4 sigmoidDerivative(double4x4 x)
+{
+    const double4x4 s = activation(x, 0);
+    return s * (1.0 - s);
+}
+
+// Define the derivative of the activation function (tanh derivative)
+double4x4 tanhDerivative(double4x4 x)
+{
+    const double4x4 t = activation(x, 1);
+    return 1.0 - t * t;
+}
+
+// Define the derivative of the activation function (relu derivative)
+double4x4 reluDerivative(double4x4 x)
+{
+    return x > 0.0 ? 1.0 : 0.0;
+}
+
+// Define the derivative of the activation function (leaky relu derivative)
+double4x4 leakyReluDerivative(double4x4 x)
+{
+    return x > 0.0 ? 1.0 : 0.01;
+}
+
+// Define the derivative of the activation function (softplus derivative)
+double4x4 softplusDerivative(double4x4 x)
+{
+    return 1.0 / (1.0 + exp(-x));
+}
+
+// Define the derivative of the activation function (softsign derivative)
+double4x4 softsignDerivative(double4x4 x)
+{
+    return 1.0 / (1.0 + abs(x));
+}
+
+// Define the derivative of the activation function (sin derivative)
+double4x4 sinDerivative(double4x4 x)
+{
+    return cos(x * 3.1415926535897932384626433832795);
+}
+
+// Define the derivative of the activation function (cos derivative)
+double4x4 cosDerivative(double4x4 x)
+{
+    return -sin(x);
+}
+
+// Define the derivative of the activation function (tan derivative)
+double4x4 tanDerivative(double4x4 x)
+{
+    return 1.0 / (cos(x) * cos(x));
+}
+
+// Define the derivative of the activation function (asin derivative)
+double4x4 asinDerivative(double4x4 x)
+{
+    return 1.0 / sqrt(1.0 - x * x);
+}
+
+// Define the derivative of the activation function (acos derivative)
+double4x4 acosDerivative(double4x4 x)
+{
+    return -1.0 / sqrt(1.0 - x * x);
+}
+
+// Define the derivative of the activation function (atan derivative)
+double4x4 atanDerivative(double4x4 x)
+{
+    return 1.0 / (1.0 + x * x);
+}
+
+// Define the derivative of the activation function (sinh derivative)
+double4x4 sinhDerivative(double4x4 x)
+{
+    return cosh(x);
+}
+
+// Define the derivative of the activation function (cosh derivative)
+double4x4 coshDerivative(double4x4 x)
+{
+    return sinh(x);
+}
+
+// Define the derivative of the activation function (swish derivative)
+double4x4 swishDerivative(double4x4 x)
+{
+    return sigmoid(x) + x * sigmoidDerivative(x);
+}
+
+// Define the derivative of the activation function (sigmoid with sin derivative)
+double4x4 sigmoid_with_sinDerivative(double4x4 x)
+{
+    return sigmoidDerivative(x) * sinDerivative(x);
+}
+
+// Define the derivative of the activation function (sigmoid with cos derivative)
+double4x4 sigmoid_with_cosDerivative(double4x4 x)
+{
+    return sigmoidDerivative(x) * cosDerivative(x);
+}
+
+// Define the derivative of the activation function (sigmoid with tan derivative)
+double4x4 sigmoid_with_tanDerivative(double4x4 x)
+{
+    return sigmoidDerivative(x) * tanDerivative(x);
+}
+
+// Define the derivative of the activation function (sigmoid with asin derivative)
+double4x4 sigmoid_with_asinDerivative(double4x4 x)
+{
+    return sigmoidDerivative(x) * asinDerivative(x);
+}
+
+// Define the derivative of the activation function (sigmoid with acos derivative)
+double4x4 sigmoid_with_acosDerivative(double4x4 x)
+{
+    return sigmoidDerivative(x) * acosDerivative(x);
+}
+
+// Define the derivative of the activation function (sigmoid with atan derivative)
+double4x4 sigmoid_with_atanDerivative(double4x4 x)
+{
+    return sigmoidDerivative(x) * atanDerivative(x);
+}
+
+// Define the derivative of the activation function (sigmoid with sinh derivative)
+double4x4 sigmoid_with_sinhDerivative(double4x4 x)
+{
+    return sigmoidDerivative(x) * sinhDerivative(x);
+}
+
+// Define the derivative of the activation function (sigmoid with cosh derivative)
+double4x4 sigmoid_with_coshDerivative(double4x4 x)
+{
+    return sigmoidDerivative(x) * coshDerivative(x);
+}
+
+// Define the derivative of the activation function (tanh with sin derivative)
+double4x4 tanh_with_sinDerivative(double4x4 x)
+{
+    return tanhDerivative(x) * sinDerivative(x);
+}
+
+// Define the derivative of the activation function (tanh with cos derivative)
+double4x4 tanh_with_cosDerivative(double4x4 x)
+{
+    return tanhDerivative(x) * cosDerivative(x);
+}
+
+// Define the derivative of the activation function (tanh with tan derivative)
+double4x4 tanh_with_tanDerivative(double4x4 x)
+{
+    return tanhDerivative(x) * tanDerivative(x);
+}
+
+// Define the derivative of the activation function (tanh with asin derivative)
+double4x4 tanh_with_asinDerivative(double4x4 x)
+{
+    return tanhDerivative(x) * asinDerivative(x);
+}
+
+// Define the derivative of the activation function (tanh with acos derivative)
+double4x4 tanh_with_acosDerivative(double4x4 x)
+{
+    return tanhDerivative(x) * acosDerivative(x);
+}
+
+// Define the derivative of the activation function (tanh with atan derivative)
+double4x4 tanh_with_atanDerivative(double4x4 x)
+{
+    return tanhDerivative(x) * atanDerivative(x);
+}
+
+// Define the derivative of the activation function (tanh with sinh derivative)
+double4x4 tanh_with_sinhDerivative(double4x4 x)
+{
+    return tanhDerivative(x) * sinhDerivative(x);
+}
+
+// Define the derivative of the activation function (tanh with cosh derivative)
+double4x4 tanh_with_coshDerivative(double4x4 x)
+{
+    return tanhDerivative(x) * coshDerivative(x);
+}
+
+// Define the derivative of the activation function (relu with sin derivative)
+double4x4 relu_with_sinDerivative(double4x4 x)
+{
+    return reluDerivative(x) * sinDerivative(x);
+}
+
+// Define the derivative of the activation function (relu with cos derivative)
+double4x4 relu_with_cosDerivative(double4x4 x)
+{
+    return reluDerivative(x) * cosDerivative(x);
+}
+
+// Define the derivative of the activation function (relu with tan derivative)
+double4x4 relu_with_tanDerivative(double4x4 x)
+{
+    return reluDerivative(x) * tanDerivative(x);
+}
+
+// Define the derivative of the activation function (relu with asin derivative)
+double4x4 relu_with_asinDerivative(double4x4 x)
+{
+    return reluDerivative(x) * asinDerivative(x);
+}
+
+// Define the derivative of the activation function (relu with acos derivative)
+double4x4 relu_with_acosDerivative(double4x4 x)
+{
+    return reluDerivative(x) * acosDerivative(x);
+}
+
+// Define the derivative of the activation function (relu with atan derivative)
+double4x4 relu_with_atanDerivative(double4x4 x)
+{
+    return reluDerivative(x) * atanDerivative(x);
+}
+
+// Define the derivative of the activation function (relu with sinh derivative)
+double4x4 relu_with_sinhDerivative(double4x4 x)
+{
+    return reluDerivative(x) * sinhDerivative(x);
+}
+
+// Define the derivative of the activation function (relu with cosh derivative)
+double4x4 relu_with_coshDerivative(double4x4 x)
+{
+    return reluDerivative(x) * coshDerivative(x);
+}
+
+// Define the derivative of the activation function (leaky relu with sin derivative)
+double4x4 leaky_relu_with_sinDerivative(double4x4 x)
+{
+    return leakyReluDerivative(x) * sinDerivative(x);
+}
+
+// Define the derivative of the activation function (leaky relu with cos derivative)
+double4x4 leaky_relu_with_cosDerivative(double4x4 x)
+{
+    return leakyReluDerivative(x) * cosDerivative(x);
+}
+
+// Define the derivative of the activation function (leaky relu with tan derivative)
+double4x4 leaky_relu_with_tanDerivative(double4x4 x)
+{
+    return leakyReluDerivative(x) * tanDerivative(x);
+}
+
+// Define the derivative of the activation function (leaky relu with asin derivative)
+double4x4 leaky_relu_with_asinDerivative(double4x4 x)
+{
+    return leakyReluDerivative(x) * asinDerivative(x);
+}
+
+// Define the derivative of the activation function (leaky relu with acos derivative)
+double4x4 leaky_relu_with_acosDerivative(double4x4 x)
+{
+    return leakyReluDerivative(x) * acosDerivative(x);
+}
+
+// Define the derivative of the activation function (leaky relu with atan derivative)
+double4x4 leaky_relu_with_atanDerivative(double4x4 x)
+{
+    return leakyReluDerivative(x) * atanDerivative(x);
+}
+
+// Define the derivative of the activation function (leaky relu with sinh derivative)
+double4x4 leaky_relu_with_sinhDerivative(double4x4 x)
+{
+    return leakyReluDerivative(x) * sinhDerivative(x);
+}
+
+// Define the derivative of the activation function (leaky relu with cosh derivative)
+double4x4 leaky_relu_with_coshDerivative(double4x4 x)
+{
+    return leakyReluDerivative(x) * coshDerivative(x);
+}
+
+double4x4 swishWithSinDerivative(double4x4 x)
+{
+    return swishDerivative(x) * sinDerivative(x);
+}
+
+// The derivative of the activation function
+StructuredBuffer<int> derivativeFunction : register(t1);
+
+double4x4 derivative(float x, int function)
+{
+    switch (function)
+    {
+    case 0:
+        return sigmoidDerivative(x);
+    case 1:
+        return tanhDerivative(x);
+    case 2:
+        return reluDerivative(x);
+    case 3:
+        return swishWithSinDerivative(x);
+    default:
+        return leakyReluDerivative(x);
+    }
+}
+
+// The structure of a network
+struct Network
+{
+    double4x4 nodes[100];
+    double4x4 biases[100];
+    double4x4 weights[100];
+    //TODO: Add condition to check if layer index is 0, and if it is, continue
+    uint layers[10];
+    uint layerCount;
+    uint activationFunction;
+
+    uint nodeCount;
+
+    uint derivativeFunction;
+    double4x4 desiredOutput[100];
+    float learning_rate;
+    float error;
+
+    double4x4 input[100];
+    double4x4 output[100];
+};
+
+// The current network
+RWStructuredBuffer<Network> network : register(u0);
+
+//Temporary variables for the network Kernels
+Network currentNetwork;
+uint layers[10];
+
+uint layerStart;
+uint prevLayerStart;
+uint layerSize;
+uint prevLayerSize;
+
+uint layerIndex;
+uint nodeIndex;
+uint prevNodeIndex;
+
+uint loopIndex;
+uint loopStart;
+uint loopSize;
+
+
+[numthreads(4, 4, 1)]
+// Inference
+void feedforward(uint3 id : SV_DispatchThreadID)
+{
+    currentNetwork = network[id.x];
+    layers = currentNetwork.layers;
+    double4x4 nodes[100];
+
+    // Nested for loops to iterate through the layers, flattened into single loops
+    // The first 100 loops are for the input layer
+    for(loopIndex = 0; loopIndex < 100; loopIndex++)
+    {
+        layerIndex = loopIndex / 100; // The current layer
+        nodeIndex = (loopIndex % 100)/10; // The current node
+        prevNodeIndex = (loopIndex % 100)%10; // The previous node
+        
+        layerStart = layers[layerIndex];
+        prevLayerStart = layers[clamp(layerIndex - 1, 0, 9)];
+        
+        layerSize = layers[layerIndex + 1] - layers[layerIndex];
+        prevLayerSize = layers[layerIndex] - layers[clamp(layerIndex - 1, 0, 9)];
+        
+        nodes[layerStart + nodeIndex] = currentNetwork.input[nodeIndex];
+    }
+
+    float mean = 0;
+    
+    // The next loops are for the hidden layers
+    loopSize = (currentNetwork.layerCount*100)-100;
+    for (loopIndex = 100; loopIndex < loopSize; loopIndex++)
+    {
+        layerIndex = loopIndex / 100; // The current layer
+        nodeIndex = (loopIndex % 100)/10; // The current node
+        prevNodeIndex = (loopIndex % 100)%10; // The previous node
+        
+        layerStart = layers[layerIndex];
+        prevLayerStart = layers[layerIndex-1];
+        
+        layerSize = layers[layerIndex + 1] - layers[layerIndex];
+        prevLayerSize = layers[layerIndex] - layers[layerIndex - 1];
+
+        double4x4 sum = currentNetwork.weights[layerStart + nodeIndex];
+        const double4x4 weight = currentNetwork.weights[layerStart + nodeIndex];
+        const double4x4 lastWeight = currentNetwork.weights[prevLayerStart * prevNodeIndex];
+
+        // Compute the weighted sum
+        sum += weight * lastWeight;
+
+        // Pseudo Batch Normalization
+        // Get the layers mean
+        mean *= clamp(layerIndex%10,0,1);
+        mean = (sum + mean) / (layerIndex%10 + 1);
+    
+        // Run the weighted sum through the activation function00
+        nodes[layerStart + nodeIndex] = activation(sum, currentNetwork.activationFunction);
+    }
+    
+    // The last 100 loops are for the output layer
+    loopStart = (currentNetwork.layerCount*100)-100;
+    loopSize = currentNetwork.layerCount*100;
+    for (loopIndex = loopStart; loopIndex < loopSize; loopIndex++)
+    {
+        layerIndex = loopIndex / 100; // The current layer
+        nodeIndex = (loopIndex % 100)/10; // The current node
+        prevNodeIndex = (loopIndex % 100)%10; // The previous node
+        
+        layerStart = layers[layerIndex];
+        prevLayerStart = layers[layerIndex-1];
+        
+        layerSize = layers[layerIndex + 1] - layers[layerIndex];
+        prevLayerSize = layers[layerIndex] - layers[layerIndex - 1];
+
+        double4x4 sum = currentNetwork.weights[layerStart + nodeIndex];
+        const double4x4 weight = currentNetwork.weights[layerStart + nodeIndex];
+    
+        const double4x4 lastWeight = currentNetwork.weights[prevLayerStart * prevNodeIndex];
+
+        // Compute the weighted sum
+        sum += weight * lastWeight;
+    
+        // Run the weighted sum through the activation function
+        nodes[layerStart + nodeIndex] = activation(sum, currentNetwork.activationFunction);
+    }
+
+    currentNetwork.nodes = nodes;
+}
+
+[numthreads(4, 4, 1)]
+// Backpropagate the error determined by the desired outputs through the network
+void train(uint3 id : SV_DispatchThreadID)
+{
+    currentNetwork = network[id.x];
+    layers = currentNetwork.layers;
+    
+    // Nested for loop to iterate through the layers, flattened into a single loop
+    for (loopIndex = 0; loopIndex < 900; loopIndex++)
+    {
+        // Nested for loop to iterate through the layers, flattened into a single loop
+        layerIndex = currentNetwork.layerCount - (loopIndex / 100); // The current layer
+        nodeIndex = (currentNetwork.nodeCount - loopIndex % 100)/10; // The current node
+        prevNodeIndex = (currentNetwork.nodeCount - loopIndex % 100)%10; // The previous node
+        
+        layerStart = layers[layerIndex];
+        prevLayerStart = layers[layerIndex+1];
+        
+        layerSize = layers[layerIndex + 1] - layers[layerIndex];
+        prevLayerSize = layers[layerIndex + 2] - layers[layerIndex + 1];
+        
+        // Calculate the error
+        double4x4 error = currentNetwork.desiredOutput[nodeIndex] - currentNetwork.nodes[layerStart + nodeIndex];
+        // Calculate the derivative of the activation function
+        const double4x4 derivative = sigmoidDerivative(currentNetwork.nodes[layerStart + nodeIndex]);
+        // Calculate the delta
+        const double4x4 delta = error * derivative;
+        // Adjust the bias
+        currentNetwork.biases[layerStart + nodeIndex] += delta * currentNetwork.learning_rate;
+    
+        // Adjust the weights
+        const double4x4 lastWeight = currentNetwork.weights[prevLayerStart + prevNodeIndex];
+        currentNetwork.weights[layerStart + nodeIndex] += lastWeight * delta * currentNetwork.learning_rate;
+    }
+}
+
+[numthreads(4, 4, 1)]
+// Backpropagate the error stored in the current network, through the network
+void backpropagate(uint3 id : SV_DispatchThreadID)
+{
+    currentNetwork = network[id.x];
+    layers = currentNetwork.layers;
+    
+    // Nested for loop to iterate through the layers, flattened into a single loop
+    for (loopIndex = 0; loopIndex < 900; loopIndex++)
+    {
+        // Nested for loop to iterate through the layers, flattened into a single loop
+        layerIndex = currentNetwork.layerCount - (loopIndex / 100); // The current layer
+        nodeIndex = (currentNetwork.nodeCount - loopIndex % 100)/10; // The current node
+        prevNodeIndex = (currentNetwork.nodeCount - loopIndex % 100)%10; // The previous node
+        
+        layerStart = layers[layerIndex];
+        prevLayerStart = layers[layerIndex+1];
+        
+        layerSize = layers[layerIndex + 1] - layers[layerIndex];
+        prevLayerSize = layers[layerIndex + 2] - layers[layerIndex + 1];
+        
+        // Calculate the error
+        double4x4 error = currentNetwork.error;
+        // Calculate the derivative of the activation function
+        const double4x4 derivative = sigmoidDerivative(currentNetwork.nodes[layerStart + nodeIndex]);
+        // Calculate the delta
+        const double4x4 delta = error * derivative;
+        // Adjust the bias
+        currentNetwork.biases[layerStart + nodeIndex] += delta * currentNetwork.learning_rate;
+    
+        // Adjust the weights
+        const double4x4 lastWeight = currentNetwork.weights[prevLayerStart + prevNodeIndex];
+        currentNetwork.weights[layerStart + nodeIndex] += lastWeight * delta * currentNetwork.learning_rate;
+    }
+}
+
