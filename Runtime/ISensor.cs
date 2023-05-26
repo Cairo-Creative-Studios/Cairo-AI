@@ -1,7 +1,7 @@
 
 namespace AI.Core
 {
-    public abstract class ISensor
+    public interface ISensor
     {
         /// <summary>
         /// The number of inputs that the sensor provides
@@ -11,6 +11,6 @@ namespace AI.Core
         /// Get the inputs from the sensor
         /// </summary>
         /// <returns></returns>
-        public abstract byte[] GetInputs();
+        public float[] GetInputs();
     }
 }

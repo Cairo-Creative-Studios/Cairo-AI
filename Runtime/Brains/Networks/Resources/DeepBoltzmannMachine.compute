@@ -1,0 +1,143 @@
+#pragma kernel RBMComputeShader
+
+StructuredBuffer<float> inputBuffer;
+RWStructuredBuffer<float> weightBuffer;
+RWStructuredBuffer<float> visibleBiasBuffer;
+RWStructuredBuffer<float> hiddenBiasBuffer;
+RWStructuredBuffer<float> positivePhaseBuffer;
+RWStructuredBuffer<float> negativePhaseBuffer;
+
+int n_visible;
+int n_hidden;
+
+[numthreads(64, 1, 1)]
+void RBMComputeShader(uint3 id : SV_DispatchThreadID)
+{
+    // RBM parameters
+    float learningRate = 0.1;
+    int CD_k = 10;
+
+    // RBM variables
+    float4 W;
+    float4 visibleBias;
+    float4 hiddenBias;
+
+    // Initialize RBM parameters
+    if (id.x < n_hidden && id.y < n_visible)
+    {
+        float2 randValues = Random(id.xy);
+        float range = 1.0 / (n_visible + n_hidden);
+        float initialValue = -range + (randValues.x * 2.0 * range);
+        W = float4(initialValue, initialValue, initialValue, initialValue);
+    }
+
+    if (id.x < n_visible)
+    {
+        visibleBias = float4(0.0, 0.0, 0.0, 0.0);
+        positivePhaseBuffer[id.x] = 0.0;
+        negativePhaseBuffer[id.x] = 0.0;
+    }
+
+    if (id.x < n_hidden)
+    {
+        hiddenBias = float4(0.0, 0.0, 0.0, 0.0);
+    }
+
+    // Barrier to synchronize all threads
+    GroupMemoryBarrierWithGroupSync();
+
+    // Perform RBM forward pass
+    if (id.x < n_visible)
+    {
+        float4 visible = inputBuffer[id.x];
+
+        // Compute p_h
+        float4 p_h = Sigmoid(Mul(visible, W) + hiddenBias);
+        float4 sample_h = Bernoulli(p_h);
+
+        // Perform CD-k steps
+        for (int step = 0; step < CD_k; step++)
+        {
+            // Compute p_v
+            float4 p_v = Sigmoid(Mul(sample_h, W.yzwx) + visibleBias);
+            float4 sample_v = Bernoulli(p_v);
+
+            // Compute p_h
+            p_h = Sigmoid(Mul(sample_v, W) + hiddenBias);
+            sample_h = Bernoulli(p_h);
+        }
+
+        // Update positive phase
+        positivePhaseBuffer[id.x] = visible.x;
+        positivePhaseBuffer[id.x + n_visible] = sample_v.x;
+    }
+
+    // Barrier to synchronize all threads
+    GroupMemoryBarrierWithGroupSync();
+
+    // Perform RBM backward pass
+    if (id.x < n_visible)
+    {
+        float4 visible = inputBuffer[id.x];
+
+        // Compute p_h
+        float4 p_h = Sigmoid(Mul(visible, W) + hiddenBias);
+        float4 sample_h = Bernoulli(p_h);
+
+        // Perform CD-k steps
+        for (int step = 0; step < CD_k; step++)
+        {
+            // Compute p_v
+            float4 p_v = Sigmoid(Mul(sample_h, W.yzwx) + visibleBias);
+            float4 sample_v = Bernoulli(p_v);
+
+            // Compute p_h
+            p_h = Sigmoid(Mul(sample_v, W) + hiddenBias);
+            sample_h = Bernoulli(p_h);
+        }
+
+        // Update negative phase
+        negativePhaseBuffer[id.x] = sample_v.x;
+        negativePhaseBuffer[id.x + n_visible] = visible.x;
+    }
+
+    // Barrier to synchronize all threads
+    GroupMemoryBarrierWithGroupSync();
+
+    // Update RBM parameters
+    if (id.x < n_hidden && id.y < n_visible)
+    {
+        float weightUpdate = learningRate * (positivePhaseBuffer[id.y] * positivePhaseBuffer[id.x + n_visible] - negativePhaseBuffer[id.y] * negativePhaseBuffer[id.x + n_visible]);
+        weightBuffer[id.x * n_visible + id.y] += weightUpdate;
+    }
+
+    if (id.x < n_visible)
+    {
+        visibleBiasBuffer[id.x] += learningRate * (positivePhaseBuffer[id.x] - negativePhaseBuffer[id.x]);
+    }
+
+    if (id.x < n_hidden)
+    {
+        hiddenBiasBuffer[id.x] += learningRate * (positivePhaseBuffer[id.x + n_visible] - negativePhaseBuffer[id.x + n_visible]);
+    }
+}
+
+float4 Sigmoid(float4 x)
+{
+    return 1.0 / (1.0 + exp(-x));
+}
+
+float4 Bernoulli(float4 p)
+{
+    return step(p, Random(p.xy));
+}
+
+float2 Random(float2 seed)
+{
+    return frac(sin(seed) * 43758.5453);
+}
+
+float4 Mul(float4 a, float4 b)
+{
+    return a * b;
+}

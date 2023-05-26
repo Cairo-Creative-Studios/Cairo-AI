@@ -4,6 +4,11 @@
 #pragma kernel train;
 #pragma kernel backpropagate;
 
+// Experimental Activation Function, combines ELU, Swish with some periodic sin 
+double4x4 mad_elu_swish(double4x4 x)
+{
+    return x * (1.0 / (1.0 + exp(sin(-x)^5))) + (1 * (exp(cos(x)) - 1));
+}
 
 /* Activation Functions */
 double4x4 sigmoid(double4x4 x)

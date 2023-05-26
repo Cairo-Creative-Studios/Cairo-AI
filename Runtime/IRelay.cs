@@ -13,6 +13,6 @@ namespace AI.Core
         /// Set the output of the Relay
         /// </summary>
         /// <param name="outputs"></param>
-        public abstract void SetOutput(byte[] outputs);
+        public void SetOutput(float[] outputs);
     }
 }

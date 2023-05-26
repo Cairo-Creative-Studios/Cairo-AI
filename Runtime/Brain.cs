@@ -51,7 +51,7 @@ namespace AI.Core
         /// </summary>
         public void UpdateBrain()
         {
-            List<byte> inputs = new List<byte>();
+            List<float> inputs = new List<float>();
             
             // Compute Sensors
             foreach (var sensor in Sensors)
@@ -71,7 +71,7 @@ namespace AI.Core
                 endIndex = startIndex + relay.OutputCount;
 
                 //Create the List of Outputs to apply to this Relay
-                List<byte> appliedOutput = new List<byte>();
+                List<float> appliedOutput = new List<float>();
                 for (int i = startIndex; i < endIndex; i++)
                 {
                     appliedOutput.Add(outputs[i]);
@@ -89,6 +89,6 @@ namespace AI.Core
         /// 
         /// </summary>
         /// <returns></returns>
-        public abstract byte[] Inference(byte[] inputs);
+        public abstract float[] Inference(float[] inputs);
     }
 }

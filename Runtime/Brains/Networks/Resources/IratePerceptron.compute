@@ -1,0 +1,213 @@
+
+//Define the Kernel
+#pragma kernel infer;
+
+// Combines ELU and Swish with frequency based periodicity 
+double4x4 mad_elu_swish(double4x4 x)
+{
+    return x * (1.0 / (1.0 + exp(pow(sin(-x),5)))) + (1 * (exp(cos(x)) - 1));
+}
+/*-----*/
+// Mad Elu Swish Derivative
+double4x4 mad_elu_swish_derivative(float x)
+{
+    return 1 + (-1) * (exp(pow(sin(-x),5))) * 5 * pow(sin(-x),4) * cos(-x) / (1.0 + pow(exp(pow(sin(-x),5)),2)) + (-sin(x)) * exp(cos(x));
+}
+
+// The structure of a network
+struct Network
+{
+    double4x4 nodes[100];
+    double4x4 biases[100];
+    double4x4 weights[100];
+    //TODO: Add condition to check if layer index is 0, and if it is, continue
+    uint layers[10];
+    uint layerCount;
+    uint nodeCount;
+    float learning_rate;
+    float error;
+
+    double4x4 input[100];
+    double4x4 output[100];
+};
+
+// The current network
+RWStructuredBuffer<Network> network : register(u0);
+
+//Temporary variables for the network Kernels
+Network currentNetwork;
+uint layers[10];
+
+uint layerStart;
+uint prevLayerStart;
+uint layerSize;
+uint prevLayerSize;
+
+uint layerIndex;
+uint nodeIndex;
+uint prevNodeIndex;
+
+uint loopIndex;
+uint loopStart;
+uint loopSize;
+
+
+[numthreads(4, 4, 1)]
+// Inference
+void feedforward(uint3 id : SV_DispatchThreadID)
+{
+    currentNetwork = network[id.x];
+    layers = currentNetwork.layers;
+    double4x4 nodes[100];
+
+    // Nested for loops to iterate through the layers, flattened into single loops
+    // The first 100 loops are for the input layer
+    for(loopIndex = 0; loopIndex < 100; loopIndex++)
+    {
+        layerIndex = loopIndex / 100; // The current layer
+        nodeIndex = (loopIndex % 100)/10; // The current node
+        prevNodeIndex = (loopIndex % 100)%10; // The previous node
+        
+        layerStart = layers[layerIndex];
+        prevLayerStart = layers[clamp(layerIndex - 1, 0, 9)];
+        
+        layerSize = layers[layerIndex + 1] - layers[layerIndex];
+        prevLayerSize = layers[layerIndex] - layers[clamp(layerIndex - 1, 0, 9)];
+        
+        nodes[layerStart + nodeIndex] = currentNetwork.input[nodeIndex];
+    }
+
+    float mean = 0;
+    
+    // The next loops are for the hidden layers
+    loopSize = (currentNetwork.layerCount*100)-100;
+    for (loopIndex = 100; loopIndex < loopSize; loopIndex++)
+    {
+        layerIndex = loopIndex / 100; // The current layer
+        nodeIndex = (loopIndex % 100)/10; // The current node
+        prevNodeIndex = (loopIndex % 100)%10; // The previous node
+        
+        layerStart = layers[layerIndex];
+        prevLayerStart = layers[layerIndex-1];
+        
+        layerSize = layers[layerIndex + 1] - layers[layerIndex];
+        prevLayerSize = layers[layerIndex] - layers[layerIndex - 1];
+
+        double4x4 sum = currentNetwork.weights[layerStart + nodeIndex];
+        const double4x4 weight = currentNetwork.weights[layerStart + nodeIndex];
+        const double4x4 lastWeight = currentNetwork.weights[prevLayerStart * prevNodeIndex];
+
+        // Compute the weighted sum
+        sum += weight * lastWeight;
+
+        // Pseudo Batch Normalization
+        // Get the layers mean
+        mean *= clamp(layerIndex%10,0,1);
+        mean = (sum + mean) / (layerIndex%10 + 1);
+    
+        // Run the weighted sum through the activation function00
+        nodes[layerStart + nodeIndex] = mad_elu_swish(sum);
+    }
+    
+    // The last 100 loops are for the output layer
+    loopStart = (currentNetwork.layerCount*100)-100;
+    loopSize = currentNetwork.layerCount*100;
+    for (loopIndex = loopStart; loopIndex < loopSize; loopIndex++)
+    {
+        layerIndex = loopIndex / 100; // The current layer
+        nodeIndex = (loopIndex % 100)/10; // The current node
+        prevNodeIndex = (loopIndex % 100)%10; // The previous node
+        
+        layerStart = layers[layerIndex];
+        prevLayerStart = layers[layerIndex-1];
+        
+        layerSize = layers[layerIndex + 1] - layers[layerIndex];
+        prevLayerSize = layers[layerIndex] - layers[layerIndex - 1];
+
+        double4x4 sum = currentNetwork.weights[layerStart + nodeIndex];
+        const double4x4 weight = currentNetwork.weights[layerStart + nodeIndex];
+    
+        const double4x4 lastWeight = currentNetwork.weights[prevLayerStart * prevNodeIndex];
+
+        // Compute the weighted sum
+        sum += weight * lastWeight;
+    
+        // Run the weighted sum through the activation function
+        nodes[layerStart + nodeIndex] = mad_elu_swish(sum);
+    }
+
+    currentNetwork.nodes = nodes;
+}
+
+[numthreads(4, 4, 1)]
+// Backpropagate the error determined by the desired outputs through the network
+void train(uint3 id : SV_DispatchThreadID)
+{
+    currentNetwork = network[id.x];
+    layers = currentNetwork.layers;
+    
+    // Nested for loop to iterate through the layers, flattened into a single loop
+    for (loopIndex = 0; loopIndex < 900; loopIndex++)
+    {
+        // Nested for loop to iterate through the layers, flattened into a single loop
+        layerIndex = currentNetwork.layerCount - (loopIndex / 100); // The current layer
+        nodeIndex = (currentNetwork.nodeCount - loopIndex % 100)/10; // The current node
+        prevNodeIndex = (currentNetwork.nodeCount - loopIndex % 100)%10; // The previous node
+        
+        layerStart = layers[layerIndex];
+        prevLayerStart = layers[layerIndex+1];
+        
+        layerSize = layers[layerIndex + 1] - layers[layerIndex];
+        prevLayerSize = layers[layerIndex + 2] - layers[layerIndex + 1];
+        
+        // Calculate the error
+        double4x4 error = currentNetwork.error;
+        // Calculate the derivative of the activation function
+        const double4x4 derivative = mad_elu_swish_derivative(currentNetwork.nodes[layerStart + nodeIndex]);
+        // Calculate the delta
+        const double4x4 delta = error * derivative;
+        // Adjust the bias
+        currentNetwork.biases[layerStart + nodeIndex] += delta * currentNetwork.learning_rate;
+    
+        // Adjust the weights
+        const double4x4 lastWeight = currentNetwork.weights[prevLayerStart + prevNodeIndex];
+        currentNetwork.weights[layerStart + nodeIndex] += lastWeight * delta * currentNetwork.learning_rate;
+    }
+}
+
+[numthreads(4, 4, 1)]
+// Backpropagate the error stored in the current network, through the network
+void backpropagate(uint3 id : SV_DispatchThreadID)
+{
+    currentNetwork = network[id.x];
+    layers = currentNetwork.layers;
+    
+    // Nested for loop to iterate through the layers, flattened into a single loop
+    for (loopIndex = 0; loopIndex < 900; loopIndex++)
+    {
+        // Nested for loop to iterate through the layers, flattened into a single loop
+        layerIndex = currentNetwork.layerCount - (loopIndex / 100); // The current layer
+        nodeIndex = (currentNetwork.nodeCount - loopIndex % 100)/10; // The current node
+        prevNodeIndex = (currentNetwork.nodeCount - loopIndex % 100)%10; // The previous node
+        
+        layerStart = layers[layerIndex];
+        prevLayerStart = layers[layerIndex+1];
+        
+        layerSize = layers[layerIndex + 1] - layers[layerIndex];
+        prevLayerSize = layers[layerIndex + 2] - layers[layerIndex + 1];
+        
+        // Calculate the error
+        double4x4 error = currentNetwork.error;
+        // Calculate the derivative of the activation function
+        const double4x4 derivative = sigmoidDerivative(currentNetwork.nodes[layerStart + nodeIndex]);
+        // Calculate the delta
+        const double4x4 delta = error * derivative;
+        // Adjust the bias
+        currentNetwork.biases[layerStart + nodeIndex] += delta * currentNetwork.learning_rate;
+    
+        // Adjust the weights
+        const double4x4 lastWeight = currentNetwork.weights[prevLayerStart + prevNodeIndex];
+        currentNetwork.weights[layerStart + nodeIndex] += lastWeight * delta * currentNetwork.learning_rate;
+    }
+}
+

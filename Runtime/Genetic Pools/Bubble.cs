@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AI.Core;
 using CairoAI.Layers;
 using CairoAI.Tools;
 using UnityEngine;
@@ -10,7 +11,7 @@ using Random = UnityEngine.Random;
 namespace CairoAI.EvolutionSystems
 {
     [Serializable]
-    public class Bubble
+    public class Bubble : GenePool
     {
         DumbVoronoi diagram;
         
@@ -79,9 +80,6 @@ namespace CairoAI.EvolutionSystems
         /// The mean of Magnitude of all Heads
         /// </summary>
         private float _meanMagnitude = 0;
-
-        public ComputeShader multilayerPerceptron;
-        public ComputeBuffer networkBuffer;
 
         private int step = 0;
         private int resolution;
@@ -163,7 +161,7 @@ namespace CairoAI.EvolutionSystems
             }
         }
 
-        public void Update()
+        public override void UpdatePool()
         {
             // Steps:
             // Orbit and Train 
@@ -295,6 +293,7 @@ namespace CairoAI.EvolutionSystems
                                 
                                 //Remove the Head from DomHeads
                                 DomHeads.Remove(subhead.Point);
+                                HeadCreated?.Invoke(subhead);
                                 
                                 //Replace the Head
                                 var random = Random.Range(0, resolution);
@@ -312,6 +311,7 @@ namespace CairoAI.EvolutionSystems
                             {
                                 //Remove the Head from SubHeads
                                 subHeads.Remove(subhead);
+                                HeadDestroyed?.Invoke(subhead);
                                 
                                 //Replace the Head
                                 var random = Random.Range(0, resolution);
@@ -364,6 +364,7 @@ namespace CairoAI.EvolutionSystems
             {
                 var index = DomHeads.Values.ToArray().ToList().IndexOf(head);
                 DomHeads.Remove(DomHeads.KeyAt(index));
+                
             }
             else
             {
@@ -405,7 +406,7 @@ namespace CairoAI.EvolutionSystems
         /// A head is a single entity in the genetic pool
         /// </summary>
         [Serializable]
-        public class Head
+        public class Head : Brain
         {
             public Vector3 floatingPosition;
             /// <summary>
@@ -432,7 +433,7 @@ namespace CairoAI.EvolutionSystems
             /// <summary>
             /// The brain of the head
             /// </summary>
-            public MultilayerPerceptron Brain;
+            public IratePerceptron Brain;
         }
     }
 }
