@@ -4,7 +4,7 @@ using UnityEngine;
 using AI.Core;
 using UDT.Materials;
 
-namespace YourNamespace
+namespace AI.Sensors
 {
     /// <summary>
     /// A sensor that detects the material type of objects in the environment.

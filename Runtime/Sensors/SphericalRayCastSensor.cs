@@ -1,7 +1,8 @@
 using System;
+using AI.Core;
 using UnityEngine;
 
-namespace AI.Core
+namespace AI.Sensors
 {
     [Serializable]
     public class SphericalRayCastSensor : ISensor
